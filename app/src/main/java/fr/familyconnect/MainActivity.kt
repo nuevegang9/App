@@ -15,12 +15,15 @@ import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
+
     private val pickCode = 4102
     private val port = 8989
     private val executor = Executors.newSingleThreadExecutor()
-    private var role = "child"
+
+    private var role = "parent"
     private var server: ServerSocket? = null
     private var pin = ""
+
     private lateinit var page: LinearLayout
     private lateinit var status: TextView
     private lateinit var actions: LinearLayout
@@ -37,6 +40,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         val scroll = ScrollView(this)
+
         page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(36, 28, 36, 28)
@@ -47,7 +51,7 @@ class MainActivity : Activity() {
 
         page.addView(label("Family Connect", 28, true))
         page.addView(label("Partage familial direct, sans compte cloud", 15, false))
-        page.addView(label("Les deux téléphones doivent être sur le même réseau Wi-Fi.", 14, false))
+        page.addView(label("Les deux téléphones doivent être sur le même Wi-Fi.", 14, false))
         page.addView(label("Choisis le mode de ce téléphone", 18, true))
 
         val roles = RadioGroup(this).apply {
@@ -72,14 +76,21 @@ class MainActivity : Activity() {
         actions = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+
         page.addView(actions)
 
-        status = label("Choisis le mode parent pour démarrer la réception.", 14, false)
+        status = label(
+            "Choisis le mode parent pour démarrer la réception.",
+            14,
+            false
+        )
+
         page.addView(status)
 
         listing = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
         }
+
         page.addView(listing)
 
         roles.setOnCheckedChangeListener { _, checked ->
@@ -95,14 +106,20 @@ class MainActivity : Activity() {
             text = s
             textSize = size.toFloat()
             setPadding(0, 10, 0, 10)
-            if (bold) setTypeface(null, Typeface.BOLD)
+
+            if (bold) {
+                setTypeface(null, Typeface.BOLD)
+            }
         }
 
     private fun edit(hintText: String, secret: Boolean = false) =
         EditText(this).apply {
             hint = hintText
             textSize = 15f
-            if (secret) inputType = 2
+
+            if (secret) {
+                inputType = 2
+            }
         }
 
     private fun renderActions() {
@@ -110,12 +127,20 @@ class MainActivity : Activity() {
         listing.removeAllViews()
 
         if (role == "parent") {
+
             pin = (100000..999999).random().toString()
 
-            parentAddress = label("Adresse du parent : recherche…", 16, true)
+            parentAddress = label(
+                "Adresse du parent : recherche…",
+                16,
+                true
+            )
+
             actions.addView(parentAddress)
 
-            actions.addView(label("Code de connexion : $pin", 22, true))
+            actions.addView(
+                label("Code de connexion : $pin", 22, true)
+            )
 
             actions.addView(
                 label(
@@ -127,25 +152,40 @@ class MainActivity : Activity() {
 
             actions.addView(Button(this).apply {
                 text = "Démarrer la réception"
-                setOnClickListener { startServer() }
+                setOnClickListener {
+                    startServer()
+                }
             })
 
             actions.addView(Button(this).apply {
                 text = "Actualiser les fichiers reçus"
-                setOnClickListener { showFiles() }
+                setOnClickListener {
+                    showFiles()
+                }
             })
 
             parentAddress.text =
-                "Adresse du parent : ${localIp() ?: "IP Wi-Fi introuvable — vérifie le Wi-Fi"}:$port"
+                "Adresse du parent : ${localIp() ?: "IP Wi-Fi introuvable"}:$port"
 
             showFiles()
 
         } else {
-            childAddress = edit("Adresse IP du téléphone parent (ex. 192.168.1.20)")
-            childPin = edit("Code à 6 chiffres du parent", true)
+
+            childAddress = edit(
+                "Adresse IP du téléphone parent (ex. 192.168.1.20)"
+            )
+
+            childPin = edit(
+                "Code à 6 chiffres du parent",
+                true
+            )
 
             actions.addView(
-                label("Saisis les informations affichées sur le téléphone parent.", 14, false)
+                label(
+                    "Saisis les informations affichées sur le téléphone parent.",
+                    14,
+                    false
+                )
             )
 
             actions.addView(childAddress)
@@ -155,62 +195,69 @@ class MainActivity : Activity() {
                 text = "Sélectionner des photos, vidéos ou fichiers"
 
                 setOnClickListener {
-                    val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                         addCategory(Intent.CATEGORY_OPENABLE)
                         type = "*/*"
                         putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
                     }
 
-                    startActivityForResult(i, pickCode)
+                    startActivityForResult(intent, pickCode)
                 }
             })
         }
     }
 
-    // CORRECTION : fonction avec corps classique, compatible avec return
+    // Recherche de l'adresse IP locale
     private fun localIp(): String? {
-        return try {
+        try {
             val interfaces = NetworkInterface.getNetworkInterfaces()
 
             while (interfaces.hasMoreElements()) {
-                val addresses = interfaces.nextElement().inetAddresses
+                val addresses =
+                    interfaces.nextElement().inetAddresses
 
                 while (addresses.hasMoreElements()) {
-                    val a = addresses.nextElement()
+                    val address = addresses.nextElement()
 
-                    if (!a.isLoopbackAddress &&
-                        a is Inet4Address &&
-                        a.isSiteLocalAddress
+                    if (!address.isLoopbackAddress &&
+                        address is Inet4Address &&
+                        address.isSiteLocalAddress
                     ) {
-                        return a.hostAddress
+                        return address.hostAddress
                     }
                 }
             }
-
-            null
-
         } catch (_: Exception) {
-            null
+            return null
         }
+
+        return null
     }
 
+    // Démarrage du serveur parent
     private fun startServer() {
+
         if (server != null) {
             status.text = "Réception déjà démarrée."
             return
         }
 
-        thread(name = "FamilyConnect-server", isDaemon = true) {
+        thread(
+            name = "FamilyConnect-server",
+            isDaemon = true
+        ) {
             try {
                 val socketServer = ServerSocket(port)
                 server = socketServer
 
                 runOnUiThread {
-                    status.text = "Réception active. Laisse Family Connect ouvert sur ce téléphone."
+                    status.text =
+                        "Réception active. Laisse Family Connect ouvert."
                 }
 
                 while (!socketServer.isClosed) {
                     val client = socketServer.accept()
+
                     thread(isDaemon = true) {
                         handleClient(client)
                     }
@@ -224,17 +271,22 @@ class MainActivity : Activity() {
         }
     }
 
+    // Traitement des fichiers reçus
     private fun handleClient(socket: Socket) {
+
         socket.use { s ->
+
             try {
                 s.soTimeout = 30000
 
                 val input = BufferedInputStream(s.getInputStream())
                 val headerBytes = ByteArrayOutputStream()
+
                 var state = 0
 
                 while (state < 4) {
                     val b = input.read()
+
                     if (b < 0) return
 
                     headerBytes.write(b)
@@ -252,17 +304,27 @@ class MainActivity : Activity() {
                 }
 
                 val header = headerBytes.toString("UTF-8")
-                val first = header.lineSequence().firstOrNull().orEmpty()
+
+                val first = header.lineSequence()
+                    .firstOrNull()
+                    .orEmpty()
+
                 val method = first.substringBefore(' ')
-                val path = first.split(' ').getOrNull(1).orEmpty()
+
+                val path = first.split(' ')
+                    .getOrNull(1)
+                    .orEmpty()
 
                 val headers = header.lineSequence()
                     .drop(1)
                     .mapNotNull { line ->
                         val idx = line.indexOf(':')
+
                         if (idx > 0) {
-                            line.substring(0, idx).trim().lowercase() to
-                                    line.substring(idx + 1).trim()
+                            line.substring(0, idx)
+                                .trim()
+                                .lowercase() to
+                                line.substring(idx + 1).trim()
                         } else {
                             null
                         }
@@ -275,20 +337,28 @@ class MainActivity : Activity() {
                 }
 
                 if (method == "POST" && path.startsWith("/upload")) {
-                    val length = headers["content-length"]?.toIntOrNull()
-                        ?: run {
-                            respond(s, 411, "Longueur manquante")
-                            return
-                        }
+
+                    val length =
+                        headers["content-length"]?.toIntOrNull()
+                            ?: run {
+                                respond(s, 411, "Longueur manquante")
+                                return
+                            }
 
                     if (length > 50 * 1024 * 1024) {
-                        respond(s, 413, "Fichier trop volumineux (50 Mo max)")
+                        respond(s, 413, "Fichier trop volumineux")
                         return
                     }
 
-                    val nameParam = path.substringAfter("name=", "fichier").substringBefore('&')
+                    val nameParam = path.substringAfter(
+                        "name=",
+                        "fichier"
+                    ).substringBefore('&')
 
-                    val name = URLDecoder.decode(nameParam, "UTF-8")
+                    val name = URLDecoder.decode(
+                        nameParam,
+                        "UTF-8"
+                    )
                         .replace("/", "_")
                         .replace("\\", "_")
                         .take(180)
@@ -297,12 +367,21 @@ class MainActivity : Activity() {
                     val target = uniqueFile(name)
 
                     FileOutputStream(target).use { out ->
+
                         val buffer = ByteArray(8192)
                         var remaining = length
 
                         while (remaining > 0) {
-                            val n = input.read(buffer, 0, minOf(buffer.size, remaining))
-                            if (n < 0) throw EOFException("Transfert interrompu")
+
+                            val n = input.read(
+                                buffer,
+                                0,
+                                minOf(buffer.size, remaining)
+                            )
+
+                            if (n < 0) {
+                                throw EOFException("Transfert interrompu")
+                            }
 
                             out.write(buffer, 0, n)
                             remaining -= n
@@ -317,6 +396,7 @@ class MainActivity : Activity() {
                     }
 
                 } else if (method == "GET" && path == "/files") {
+
                     val body = sharedDir.listFiles()
                         ?.filter { it.isFile }
                         ?.joinToString("\n") {
@@ -333,6 +413,7 @@ class MainActivity : Activity() {
                 }
 
             } catch (e: Exception) {
+
                 try {
                     respond(s, 500, e.message ?: "Erreur")
                 } catch (_: Exception) {
@@ -341,23 +422,32 @@ class MainActivity : Activity() {
         }
     }
 
+    // Création d'un nom de fichier unique
     private fun uniqueFile(name: String): File {
-        var f = File(sharedDir, name)
+
+        var file = File(sharedDir, name)
         var i = 1
 
-        while (f.exists()) {
-            val dot = name.lastIndexOf('.')
-            val stem = if (dot > 0) name.substring(0, dot) else name
-            val ext = if (dot > 0) name.substring(dot) else ""
+        while (file.exists()) {
 
-            f = File(sharedDir, "$stem ($i)$ext")
+            val dot = name.lastIndexOf('.')
+
+            val stem =
+                if (dot > 0) name.substring(0, dot) else name
+
+            val ext =
+                if (dot > 0) name.substring(dot) else ""
+
+            file = File(sharedDir, "$stem ($i)$ext")
             i++
         }
 
-        return f
+        return file
     }
 
+    // CORRECTION : écriture HTTP en deux étapes
     private fun respond(s: Socket, code: Int, body: String) {
+
         val bytes = body.toByteArray(Charsets.UTF_8)
 
         val reason = when (code) {
@@ -369,38 +459,49 @@ class MainActivity : Activity() {
             else -> "Error"
         }
 
+        val responseHeaders =
+            "HTTP/1.1 $code $reason\r\n" +
+            "Content-Type: text/plain; charset=utf-8\r\n" +
+            "Content-Length: ${bytes.size}\r\n" +
+            "Connection: close\r\n\r\n"
+
         val out = s.getOutputStream()
 
-        out.write(
-            "HTTP/1.1 $code $reason\r\n" +
-                    "Content-Type: text/plain; charset=utf-8\r\n" +
-                    "Content-Length: ${bytes.size}\r\n" +
-                    "Connection: close\r\n\r\n".toByteArray()
-        )
-
+        out.write(responseHeaders.toByteArray(Charsets.UTF_8))
         out.write(bytes)
         out.flush()
     }
 
+    // Sélection et envoi des fichiers
     override fun onActivityResult(
         requestCode: Int,
         resultCode: Int,
         data: Intent?
     ) {
+
         super.onActivityResult(requestCode, resultCode, data)
 
-        if (requestCode != pickCode || resultCode != RESULT_OK || data == null) return
+        if (requestCode != pickCode ||
+            resultCode != RESULT_OK ||
+            data == null
+        ) {
+            return
+        }
 
         val uris = mutableListOf<Uri>()
 
+        // CORRECTION : getItemAt(i)
         data.clipData?.let { clip ->
+
             for (i in 0 until clip.itemCount) {
-                uris.add(clip.itemAt(i).uri)
+                uris.add(clip.getItemAt(i).uri)
             }
         }
 
         if (uris.isEmpty()) {
-            data.data?.let { uris.add(it) }
+            data.data?.let {
+                uris.add(it)
+            }
         }
 
         val host = childAddress.text.toString()
@@ -411,21 +512,25 @@ class MainActivity : Activity() {
         val code = childPin.text.toString().trim()
 
         if (host.isBlank() || code.length != 6) {
-            status.text = "Entre l'adresse IP et le code à 6 chiffres avant de sélectionner les fichiers."
+            status.text =
+                "Entre l'adresse IP et le code à 6 chiffres."
             return
         }
 
         status.text = "Envoi en cours…"
 
         executor.execute {
+
             var sent = 0
             val errors = mutableListOf<String>()
 
             uris.forEach { uri ->
+
                 try {
                     val name = queryName(uri)
 
-                    val bytes = contentResolver.openInputStream(uri)
+                    val bytes = contentResolver
+                        .openInputStream(uri)
                         ?.use { it.readBytes() }
                         ?: error("Lecture impossible")
 
@@ -444,12 +549,16 @@ class MainActivity : Activity() {
             runOnUiThread {
                 status.text =
                     "$sent/${uris.size} fichier(s) envoyé(s). " +
-                            "${errors.firstOrNull()?.let { "Erreur : $it" } ?: ""}"
+                    (errors.firstOrNull()?.let {
+                        "Erreur : $it"
+                    } ?: "")
             }
         }
     }
 
+    // Récupération du nom du fichier
     private fun queryName(uri: Uri): String {
+
         var name = "fichier"
 
         contentResolver.query(
@@ -459,35 +568,47 @@ class MainActivity : Activity() {
             null,
             null
         )?.use {
+
             if (it.moveToFirst()) {
                 name = it.getString(0) ?: name
             }
         }
 
-        return name.replace("/", "_").replace("\\", "_")
+        return name
+            .replace("/", "_")
+            .replace("\\", "_")
     }
 
+    // Envoi vers le téléphone parent
     private fun upload(
         host: String,
         code: String,
         name: String,
         bytes: ByteArray
     ) {
+
         Socket().use { socket ->
-            socket.connect(InetSocketAddress(host, port), 10000)
+
+            socket.connect(
+                InetSocketAddress(host, port),
+                10000
+            )
+
             socket.soTimeout = 30000
 
             val encoded = URLEncoder.encode(name, "UTF-8")
 
             val headers =
                 "POST /upload?name=$encoded HTTP/1.1\r\n" +
-                        "Host: $host\r\n" +
-                        "X-Family-Code: $code\r\n" +
-                        "Content-Type: application/octet-stream\r\n" +
-                        "Content-Length: ${bytes.size}\r\n" +
-                        "Connection: close\r\n\r\n"
+                "Host: $host\r\n" +
+                "X-Family-Code: $code\r\n" +
+                "Content-Type: application/octet-stream\r\n" +
+                "Content-Length: ${bytes.size}\r\n" +
+                "Connection: close\r\n\r\n"
 
-            val out = BufferedOutputStream(socket.getOutputStream())
+            val out = BufferedOutputStream(
+                socket.getOutputStream()
+            )
 
             out.write(headers.toByteArray(Charsets.UTF_8))
             out.write(bytes)
@@ -503,7 +624,9 @@ class MainActivity : Activity() {
         }
     }
 
+    // Affichage des fichiers reçus
     private fun showFiles() {
+
         listing.removeAllViews()
 
         val files = sharedDir.listFiles()
@@ -511,25 +634,34 @@ class MainActivity : Activity() {
             .orEmpty()
 
         if (files.isEmpty()) {
-            listing.addView(label("Aucun fichier reçu pour le moment.", 14, false))
+            listing.addView(
+                label("Aucun fichier reçu pour le moment.", 14, false)
+            )
         }
 
-        files.sortedBy { it.name.lowercase() }.forEach { f ->
+        files.sortedBy { it.name.lowercase() }.forEach { file ->
+
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
             }
 
             row.addView(TextView(this).apply {
-                text = "${f.name} (${f.length() / 1024} Ko)"
+                text = "${file.name} (${file.length() / 1024} Ko)"
                 textSize = 14f
-                layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    -2,
+                    1f
+                )
             })
 
             row.addView(Button(this).apply {
                 text = "Ouvrir"
+
                 setOnClickListener {
-                    openFile(f)
+                    openFile(file)
                 }
             })
 
@@ -537,14 +669,16 @@ class MainActivity : Activity() {
         }
     }
 
+    // Ouverture d'un fichier
     private fun openFile(file: File) {
+
         val uri = androidx.core.content.FileProvider.getUriForFile(
             this,
             "$packageName.provider",
             file
         )
 
-        val mime = contentResolver.getType(uri) ?: when (file.extension.lowercase()) {
+        val mime = when (file.extension.lowercase()) {
             "pdf" -> "application/pdf"
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"
@@ -556,20 +690,25 @@ class MainActivity : Activity() {
             startActivity(
                 Intent(Intent.ACTION_VIEW)
                     .setDataAndType(uri, mime)
-                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    .addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
             )
         } catch (_: Exception) {
-            status.text = "Aucune application ne peut ouvrir ce fichier."
+            status.text =
+                "Aucune application ne peut ouvrir ce fichier."
         }
     }
 
     override fun onDestroy() {
+
         try {
             server?.close()
         } catch (_: Exception) {
         }
 
         executor.shutdown()
+
         super.onDestroy()
     }
 }
